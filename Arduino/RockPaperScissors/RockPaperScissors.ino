@@ -7,12 +7,13 @@
 Adafruit_Microbit_Matrix microbit;
 EddystoneBeacon eddystoneBeacon = EddystoneBeacon();
 // Accelerometer
-// MMA8653 accel;
+MMA8653 accel;
 
 const int buttonB = 11;     // the number of the right pushbutton pin
 const int buttonA = 5;     // the number of the left pushbutton pin
 
 int currentState = 0;
+int shakeNum = 0;
 
 const uint8_t stateSymbol[3][5] = {
   { B00100,
@@ -41,14 +42,17 @@ const uint8_t stateSymbol[3][5] = {
 const char power = -18; // taken from Eddystone example
 // "URLs"
 const char* rps[3] = {"http://rock.com", "http://scissors.com", "http://paper.com"};
+const char* jamming = "http://waiting.com";
 
 void setup() {
-  // accel.begin(false, 2); // 8-bit mode, 2g range
-  
+  accel.begin(false, 2); // 8-bit mode, 2g range
+
   Serial.begin(9600);
-  
-  eddystoneBeacon.begin(power, rps[0]); // power, URI
-  
+
+  eddystoneBeacon.begin(power, jamming); // power, URI
+  //delay(1000);
+  //eddystoneBeacon.end();
+
   microbit.begin();
   pinMode(buttonB, INPUT);
   pinMode(buttonA, INPUT);
@@ -58,8 +62,6 @@ void loop() {
   // broadcast every loop
   eddystoneBeacon.loop();
 
-  // accel.update();
-  
   // show currently selected symbol
   microbit.show(stateSymbol[currentState]);
   if (! digitalRead(buttonA)) { // on pressure
@@ -72,7 +74,7 @@ void loop() {
     // broadcast new symbol
     // eddystoneBeacon.begin(power, rps[currentState]);
   }
-  
+
   if (! digitalRead(buttonB)) { // on pressure
     delay(200);
     currentState++; // next symbol
@@ -83,9 +85,22 @@ void loop() {
     // broadcast new symbol
     // eddystoneBeacon.begin(power, rps[currentState]);
   }
-  /*
-  if ((accel.getX() > 10) || (accel.getY() > 10) || (accel.getZ() > 10)) {
+
+  accel.update();
+  float gMagnitude = abs((0.0156 * sqrt(pow(accel.getX(), 2) + pow(accel.getY(), 2) + pow(accel.getZ(), 2))) - 1);
+  //(accel.getX() > 50) || (accel.getY() > 50) || (accel.getZ() > 50)
+  if (gMagnitude > 0.2) {
     Serial.println("Shake detected");
+    shakeNum++;
+    delay(500);
+    if (shakeNum > 2){
+      Serial.println(rps[currentState]);
+      eddystoneBeacon.setURI(rps[currentState]);
+      delay(10000);
+      shakeNum = 0;
+    } else if (shakeNum > 0 && shakeNum < 2) {
+      eddystoneBeacon.setURI(jamming);
+    }
   }
-  */
+
 }
